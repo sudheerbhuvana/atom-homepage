@@ -34,7 +34,7 @@ export async function login(username: string, password: string): Promise<{ succe
     const cookieStore = await cookies();
     cookieStore.set(SESSION_COOKIE, session.id, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: false, // process.env.NODE_ENV === 'production', // Allow HTTP for self-hosted LAN
         sameSite: 'lax',
         expires: new Date(session.expires_at),
         path: '/',
@@ -85,7 +85,7 @@ export async function register(username: string, password: string): Promise<{ su
     const cookieStore = await cookies();
     cookieStore.set(SESSION_COOKIE, session.id, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: false, // process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         expires: new Date(session.expires_at),
         path: '/',
