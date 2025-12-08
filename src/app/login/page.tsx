@@ -14,18 +14,29 @@ export default function LoginPage() {
 
     // Check if onboarding is needed
     useEffect(() => {
-        fetch('/api/auth/session')
-            .then(res => res.json())
-            .then(data => {
-                if (data.needsOnboarding) {
-                    router.push('/onboard');
-                } else if (data.user) {
-                    router.push('/');
-                } else {
+        useEffect(() => {
+            // Safety timeout in case fetch hangs
+            const timeout = setTimeout(() => setChecking(false), 5000);
+
+            fetch('/api/auth/session', { cache: 'no-store' })
+                .then(res => res.json())
+                .then(data => {
+                    clearTimeout(timeout);
+                    if (data.needsOnboarding) {
+                        router.push('/onboard');
+                    } else if (data.user) {
+                        router.push('/');
+                    } else {
+                        setChecking(false);
+                    }
+                })
+                .catch(() => {
+                    clearTimeout(timeout);
                     setChecking(false);
-                }
-            })
-            .catch(() => setChecking(false));
+                });
+
+            return () => clearTimeout(timeout);
+        }, [router]);
     }, [router]);
 
     const handleSubmit = async (e: React.FormEvent) => {
