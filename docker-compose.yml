@@ -1,0 +1,12 @@
+services:
+  atom:
+    build: .
+    container_name: atom
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: always
+    environment:
+      - NODE_ENV=production

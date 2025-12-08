@@ -52,6 +52,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # Create data directory for SQLite with correct permissions
 RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
 ENV DATA_DIR="/app/data"
+VOLUME ["/app/data"]
 
 # Running as non-root (nextjs) is recommended for security, but 
 # we need direct access to the mounted /var/run/docker.sock (owned by root).
