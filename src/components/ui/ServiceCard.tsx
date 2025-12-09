@@ -31,7 +31,7 @@ export default function ServiceCard({ service, compact = false }: ServiceCardPro
     // Derived visual state
     // If we have no data at all (first load) OR the context explicitly says loading
     // We treat 'loading' state as the source of truth for showing the loader.
-    const status = statuses[service.url] || { state: 'loading', code: 0, latency: 0, lastUpdated: 0 };
+    const status = statuses[service.id || service.url] || { state: 'loading', code: 0, latency: 0, lastUpdated: 0 };
     const isActuallyLoading = status.state === 'loading';
 
     // Removed useEffect for auto-check - handled by Dashboard now

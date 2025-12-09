@@ -296,3 +296,32 @@
     padding: 1rem 1.5rem;
     border-top: 1px solid var(--border-color);
 }
+
+.chip {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.8rem;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: 99px;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+}
+
+.chipRemove {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    padding: 0.1rem;
+    border-radius: 50%;
+    transition: all 0.2s;
+}
+
+.chipRemove:hover {
+    background: rgba(255, 59, 48, 0.1);
+    color: #ff3b30;
+}

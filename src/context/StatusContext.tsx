@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
 
 type ServiceStatus = {
     state: 'loading' | 'up' | 'down' | 'slow';
@@ -11,62 +11,89 @@ type ServiceStatus = {
 
 interface StatusContextType {
     statuses: Record<string, ServiceStatus>;
-    checkStatus: (url: string, force?: boolean) => Promise<void>;
-    checkMany: (urls: string[], concurrency?: number, force?: boolean) => Promise<void>;
-    refreshAll: (urls: string[]) => Promise<void>;
+    checkStatus: (service: { id: string, url: string, ping?: string }, force?: boolean) => Promise<void>;
+    checkMany: (services: { id: string, url: string, ping?: string }[], concurrency?: number, force?: boolean) => Promise<void>;
+    refreshAll: (services: { id: string, url: string, ping?: string }[]) => Promise<void>;
 }
 
 const StatusContext = createContext<StatusContextType | undefined>(undefined);
 
 export function StatusProvider({ children }: { children: ReactNode }) {
     const [statuses, setStatuses] = useState<Record<string, ServiceStatus>>({});
+    const statusesRef = React.useRef(statuses);
+
+    // Keep ref in sync with state
+    React.useEffect(() => {
+        statusesRef.current = statuses;
+    }, [statuses]);
 
     // Helper: Single status check (direct network call)
-    // Used by checkStatus or as fallback
-    const fetchStatusSingle = async (url: string) => {
+    const fetchStatusSingle = async (service: { url: string, ping?: string }) => {
         try {
-            const res = await fetch(`/api/status/check?url=${encodeURIComponent(url)}`);
+            let endpoint = '';
+
+            if (service.ping) {
+                endpoint = `/api/status/ping?host=${encodeURIComponent(service.ping)}`;
+            } else {
+                if (!service.url.startsWith('http')) return { state: 'down', code: 0, latency: 0, lastUpdated: Date.now() } as ServiceStatus;
+                endpoint = `/api/status/check?url=${encodeURIComponent(service.url)}`;
+            }
+
+            const res = await fetch(endpoint);
             const data = await res.json();
-            return {
-                state: data.up ? (data.latency > 200 ? 'slow' : 'up') : 'down',
-                code: data.status,
-                latency: data.latency,
-                lastUpdated: Date.now()
-            } as ServiceStatus;
+
+            if (service.ping) {
+                // Ping response: { alive, time }
+                return {
+                    state: data.alive ? (data.time > 200 ? 'slow' : 'up') : 'down',
+                    code: data.alive ? 200 : 0,
+                    latency: data.time || 0,
+                    lastUpdated: Date.now()
+                } as ServiceStatus;
+            } else {
+                // HTTP response: { up, status, latency }
+                return {
+                    state: data.up ? (data.latency > 200 ? 'slow' : 'up') : 'down',
+                    code: data.status,
+                    latency: data.latency,
+                    lastUpdated: Date.now()
+                } as ServiceStatus;
+            }
         } catch (e) {
             return { state: 'down', code: 0, latency: 0, lastUpdated: Date.now() } as ServiceStatus;
         }
     };
 
-    const checkStatus = useCallback(async (url: string, force = false) => {
-        // Skip if not http/https
-        if (!url.startsWith('http')) return;
-
-        const current = statuses[url];
+    const checkStatus = useCallback(async (service: { id: string, url: string, ping?: string }, force = false) => {
+        const key = service.id || service.url;
+        const current = statusesRef.current[key];
         const FLASH_CACHE_MS = 1000 * 60 * 5; // 5 Minutes
 
         if (!force && current && (Date.now() - current.lastUpdated < FLASH_CACHE_MS)) {
             return;
         }
 
-        if (!current) {
+        // Optimistically set loading (check if needed to avoid flicker if already loading)
+        if (!current || current.state !== 'loading') {
             setStatuses(prev => ({
                 ...prev,
-                [url]: { state: 'loading', code: 0, latency: 0, lastUpdated: Date.now() }
+                [key]: { ...prev[key], state: 'loading' }
             }));
         }
 
-        const data = await fetchStatusSingle(url);
-        setStatuses(prev => ({ ...prev, [url]: data }));
-    }, [statuses]);
+        const data = await fetchStatusSingle(service);
+        setStatuses(prev => ({ ...prev, [key]: data }));
+    }, []); // No dependencies needed now
 
-    const checkMany = useCallback(async (urls: string[], concurrency = 5, force = false) => {
-        const uniqueUrls = [...new Set(urls.filter(u => u.startsWith('http')))];
-
-        // Filter out URLs that are already fresh if force is false
-        const urlsToFetch = uniqueUrls.filter(url => {
+    const checkMany = useCallback(async (services: { id: string, url: string, ping?: string }[], concurrency = 5, force = false) => {
+        // Filter out items that are already fresh
+        const servicesToFetch = services.filter(s => {
             if (force) return true;
-            const current = statuses[url];
+            // Skip malformed
+            if (!s.ping && !s.url.startsWith('http')) return false;
+
+            const key = s.id || s.url;
+            const current = statusesRef.current[key];
             const FLASH_CACHE_MS = 1000 * 60 * 5; // 5 Minutes
             if (current && (Date.now() - current.lastUpdated < FLASH_CACHE_MS)) {
                 return false;
@@ -74,63 +101,79 @@ export function StatusProvider({ children }: { children: ReactNode }) {
             return true;
         });
 
-        if (urlsToFetch.length === 0) return;
+        if (servicesToFetch.length === 0) return;
 
         // Mark as loading
         setStatuses(prev => {
             const next = { ...prev };
-            let changed = false;
-            urlsToFetch.forEach(url => {
-                if (force || !next[url]) {
-                    next[url] = { state: 'loading', code: 0, latency: 0, lastUpdated: Date.now() };
-                    changed = true;
+            let hasChanges = false;
+            servicesToFetch.forEach(s => {
+                const key = s.id || s.url;
+                if (!next[key] || next[key].state !== 'loading') {
+                    next[key] = { ...(next[key] || {}), state: 'loading', code: 0, latency: 0, lastUpdated: Date.now() };
+                    hasChanges = true;
                 }
             });
-            return changed ? next : prev;
+            return hasChanges ? next : prev;
         });
 
-        // Use Batch API
-        try {
-            const res = await fetch('/api/status/batch', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ urls: urlsToFetch })
-            });
-            const data = await res.json();
+        // Separate Ping vs HTTP for batching
+        const httpServices = servicesToFetch.filter(s => !s.ping && s.url.startsWith('http'));
+        const pingServices = servicesToFetch.filter(s => !!s.ping);
 
-            if (data.results) {
-                setStatuses(prev => {
-                    const next = { ...prev };
-                    Object.entries(data.results).forEach(([url, result]: [string, any]) => {
-                        next[url] = {
-                            state: result.up ? (result.latency > 200 ? 'slow' : 'up') : 'down',
-                            code: result.status,
-                            latency: result.latency,
-                            lastUpdated: Date.now()
-                        };
+        // 1. Handle HTTP Batch
+        if (httpServices.length > 0) {
+            try {
+                // Map to unique URLs for the API
+                const urls = [...new Set(httpServices.map(s => s.url))];
+
+                const res = await fetch('/api/status/batch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ urls })
+                });
+                const data = await res.json();
+
+                if (data.results) {
+                    setStatuses(prev => {
+                        const next = { ...prev };
+                        Object.entries(data.results).forEach(([url, result]: [string, any]) => {
+                            // We need to map back to IDs. 
+                            httpServices.filter(s => s.url === url).forEach(s => {
+                                const key = s.id || s.url;
+                                next[key] = {
+                                    state: result.up ? (result.latency > 200 ? 'slow' : 'up') : 'down',
+                                    code: result.status,
+                                    latency: result.latency,
+                                    lastUpdated: Date.now()
+                                };
+                            });
+                        });
+                        return next;
                     });
-                    return next;
-                });
+                }
+            } catch (e) {
+                console.error("Batch fetch failed", e);
             }
-        } catch (e) {
-            console.error("Batch fetch failed", e);
-            setStatuses(prev => {
-                const next = { ...prev };
-                urlsToFetch.forEach(url => {
-                    // Fallback to down or keep loading? Down prevents infinite load.
-                    next[url] = { state: 'down', code: 0, latency: 0, lastUpdated: Date.now() };
-                });
-                return next;
-            });
         }
-    }, [statuses]);
 
-    const refreshAll = useCallback(async (urls: string[]) => {
-        return checkMany(urls, 5, true);
+        // 2. Handle Pings (Parallel)
+        await Promise.all(pingServices.map(async (s) => {
+            const result = await fetchStatusSingle(s);
+            setStatuses(prev => ({
+                ...prev,
+                [s.id || s.url]: result
+            }));
+        }));
+
+    }, []); // No dependencies needed now
+
+    const refreshAll = useCallback(async (services: any[]) => {
+        return checkMany(services, 5, true);
     }, [checkMany]);
 
     return (
-        <StatusContext.Provider value={{ statuses, checkStatus, checkMany, refreshAll }}>
+        <StatusContext.Provider value={{ statuses, checkStatus: checkStatus as any, checkMany: checkMany as any, refreshAll: refreshAll as any }}>
             {children}
         </StatusContext.Provider>
     );

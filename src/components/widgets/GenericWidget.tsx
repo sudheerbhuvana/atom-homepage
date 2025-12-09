@@ -1,0 +1,122 @@
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import WidgetContainer from './WidgetContainer';
+import WidgetBlock from './WidgetBlock';
+import { LucideIcon, icons } from 'lucide-react';
+import * as LucideIcons from 'lucide-react';
+
+export interface FieldMapping {
+    label: string;
+    path: string; // dot notation e.g. "stats.cpu"
+    format?: 'number' | 'bytes' | 'percent' | 'string';
+    suffix?: string;
+}
+
+export interface GenericWidgetProps {
+    title: string;
+    icon?: string; // Icon name
+    endpoint: string;
+    href?: string;
+    fields: FieldMapping[];
+    refreshInterval?: number;
+}
+
+// Helper to safely get nested value
+const getNestedValue = (obj: any, path: string) => {
+    return path.split('.').reduce((acc, part) => acc && acc[part], obj);
+};
+
+const formatValue = (value: any, format?: string, suffix?: string) => {
+    if (value === undefined || value === null) return '-';
+
+    let formatted = value;
+
+    if (format === 'bytes') {
+        const bytes = Number(value);
+        if (isNaN(bytes)) return value;
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        formatted = parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    } else if (format === 'percent') {
+        formatted = `${Number(value).toFixed(1)}%`;
+    } else if (format === 'number') {
+        formatted = new Intl.NumberFormat().format(Number(value));
+    }
+
+    if (suffix && format !== 'bytes' && format !== 'percent') {
+        formatted = `${formatted}${suffix}`;
+    }
+
+    return formatted;
+};
+
+export default function GenericWidget({
+    title,
+    icon,
+    endpoint,
+    href,
+    fields,
+    refreshInterval = 10000
+}: GenericWidgetProps) {
+    const [data, setData] = useState<any>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    // Resolve Icon
+    const IconComponent = icon ? (LucideIcons as any)[icon] : null;
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                // Use internal proxy to avoid CORS issues
+                const proxyUrl = `/api/proxy?url=${encodeURIComponent(endpoint)}`;
+                const res = await fetch(proxyUrl, { credentials: 'include' });
+
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}`);
+                }
+                const json = await res.json();
+                setData(json);
+                setError(null);
+            } catch (err: any) {
+                console.error(`Failed to fetch widget data for ${title}:`, err);
+                setError(err.message || 'Fetch failed');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+        const interval = setInterval(fetchData, refreshInterval);
+        return () => clearInterval(interval);
+    }, [endpoint, refreshInterval, title]);
+
+    if (loading && !data && !error) {
+        return (
+            <WidgetContainer title={title} icon={IconComponent && <IconComponent size={16} />} href={href}>
+                <div className="flex items-center justify-center w-full text-xs text-muted-foreground animate-pulse">
+                    Loading...
+                </div>
+            </WidgetContainer>
+        );
+    }
+
+    return (
+        <WidgetContainer
+            title={title}
+            icon={IconComponent && <IconComponent size={16} />}
+            error={error}
+            href={href}
+        >
+            {fields.map((field, idx) => (
+                <WidgetBlock
+                    key={idx}
+                    label={field.label}
+                    value={data ? formatValue(getNestedValue(data, field.path), field.format, field.suffix) : '-'}
+                />
+            ))}
+        </WidgetContainer>
+    );
+}

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Sun, Moon, Settings, LogOut, Keyboard, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import styles from './Dashboard.module.css';
+import styles from '../Dashboard.module.css';
 
 interface ClockWidgetProps {
     className?: string;

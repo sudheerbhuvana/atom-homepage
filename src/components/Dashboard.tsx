@@ -5,12 +5,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Search, Grid3X3, Grid2X2, List as ListIcon } from 'lucide-react';
 import { AppConfig } from '@/types';
-import ServiceCard from './ServiceCard';
-import SystemStatsWidget from './SystemStats';
-import DockerWidget from './DockerWidget';
-import ShortcutsModal from './ShortcutsModal';
-import ClockWidget from './ClockWidget';
+import ServiceCard from './ui/ServiceCard';
+import SystemStatsWidget from './widgets/SystemStats';
+import DockerWidget from './widgets/DockerWidget';
+import ShortcutsModal from './modals/ShortcutsModal';
+import ClockWidget from './widgets/ClockWidget';
 import { useStatus } from '@/context/StatusContext';
+import GenericWidget from './widgets/GenericWidget';
 import styles from './Dashboard.module.css';
 
 import { useConfig } from '@/context/ConfigContext';
@@ -28,9 +29,9 @@ export default function Dashboard() {
     // Initial Status Check
     useEffect(() => {
         if (!config?.services) return;
-        const urls = config.services.map(s => s.url);
+        if (!config?.services) return;
         // Fire and forget, context handles throttling
-        checkMany(urls);
+        checkMany(config.services);
     }, [config?.services, checkMany]);
 
     // Keyboard shortcuts
@@ -110,8 +111,10 @@ export default function Dashboard() {
 
     const handleRefresh = async () => {
         if (!config) return;
-        const urls = config.services.map(s => s.url);
-        await refreshAll(urls);
+        const handleRefresh = async () => {
+            if (!config) return;
+            await refreshAll(config.services);
+        };
     };
 
     if (loading || !config) return <div className={styles.loader}>Loading...</div>;
@@ -195,6 +198,15 @@ export default function Dashboard() {
                             <div key={widget.id} style={{ marginBottom: '2rem' }}>
                                 <h2 className={styles.sectionHeader}>{widget.title || 'Widget'}</h2>
                                 {widget.type === 'system-monitor' && <SystemStatsWidget />}
+                                {widget.type === 'generic' && (
+                                    <GenericWidget
+                                        title={widget.title || 'Widget'}
+                                        endpoint={widget.options?.endpoint}
+                                        fields={widget.options?.fields || []}
+                                        refreshInterval={widget.options?.refreshInterval}
+                                    />
+                                )}
+                                {widget.type === 'docker' && <DockerWidget />}
                             </div>
                         ))}
                         {/* Fallback if widgets array is missing but showWidgets is true/undefined */}

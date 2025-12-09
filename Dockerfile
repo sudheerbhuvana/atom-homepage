@@ -32,7 +32,7 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Install sqlite runtime deps
-RUN apk add --no-cache sqlite-libs
+RUN apk add --no-cache sqlite-libs iputils
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs

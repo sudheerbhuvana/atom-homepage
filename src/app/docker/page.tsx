@@ -13,14 +13,14 @@ export default function DockerDashboard() {
 
     const fetchContainers = async () => {
         try {
-            const res = await fetch('/api/docker');
+            const res = await fetch('/api/docker/containers');
             if (res.ok) {
                 const data = await res.json();
-                setContainers(data);
+                setContainers(data.containers);
                 setLastUpdated(new Date());
             }
         } catch (e) {
-            console.error('Failed to fetch docker stats', e);
+            console.error('Failed to fetch containers:', e);
         } finally {
             setLoading(false);
         }
@@ -81,7 +81,7 @@ export default function DockerDashboard() {
                                         <div>
                                             <span
                                                 className={`${styles.statusDot} ${container.state === 'running' ? styles.statusRunning :
-                                                        container.state === 'exited' ? styles.statusExited : styles.statusPaused
+                                                    container.state === 'exited' ? styles.statusExited : styles.statusPaused
                                                     }`}
                                             />
                                             {container.state}
@@ -91,20 +91,20 @@ export default function DockerDashboard() {
                                         </div>
                                     </td>
                                     <td>
-                                        <div>{container.cpu}%</div>
+                                        <div>{container.cpu?.toFixed(1) || '0.0'}%</div>
                                         <div className={styles.usageBar}>
                                             <div
-                                                className={`${styles.usageFill} ${getUsageColor(container.cpu)}`}
-                                                style={{ width: `${Math.min(container.cpu, 100)}%` }}
+                                                className={`${styles.usageFill} ${getUsageColor(container.cpu || 0)}`}
+                                                style={{ width: `${Math.min(container.cpu || 0, 100)}%` }}
                                             />
                                         </div>
                                     </td>
                                     <td>
-                                        <div>{container.memory}</div>
+                                        <div>{container.memory || '-'}</div>
                                         <div className={styles.usageBar}>
                                             <div
-                                                className={`${styles.usageFill} ${getUsageColor(container.memPercent)}`}
-                                                style={{ width: `${Math.min(container.memPercent, 100)}%` }}
+                                                className={`${styles.usageFill} ${getUsageColor(container.memPercent || 0)}`}
+                                                style={{ width: `${Math.min(container.memPercent || 0, 100)}%` }}
                                             />
                                         </div>
                                     </td>

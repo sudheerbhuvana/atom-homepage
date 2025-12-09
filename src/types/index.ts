@@ -13,6 +13,7 @@ export interface Service {
     category?: string;
     description?: string;
     color?: string; // Optional accent color override
+    ping?: string;  // Optional Host/IP for ICMP ping
     createdAt?: number;
     updatedAt?: number;
 }
@@ -51,7 +52,7 @@ export interface AppConfig {
 
 export interface Widget {
     id: string;
-    type: 'system-monitor' | 'weather' | 'clock'; // Add more types later
+    type: 'system-monitor' | 'weather' | 'clock' | 'generic' | 'docker'; // Add more types later
     title?: string;
     options?: Record<string, any>;
 }
@@ -75,8 +76,8 @@ export interface DockerContainer {
     image: string;
     state: string;
     status: string;
-    cpu: number;
-    memory: string;
-    memPercent: number;
+    cpu?: number;
+    memory?: string;
+    memPercent?: number;
     ports: string;
 }

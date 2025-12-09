@@ -4,20 +4,23 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Save, Upload, Download, Trash2, Edit3, Plus, Sun, Moon, Code, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { AppConfig, Service, Link as AppLink } from '@/types';
+import { AppConfig, Service, Link as AppLink, Widget } from '@/types';
 import { useTheme } from '@/context/ThemeContext';
-import AddServiceModal from '@/components/AddServiceModal';
-import EditServiceModal from '@/components/EditServiceModal';
-import UserManagement from '@/components/UserManagement';
+import AddServiceModal from '@/components/modals/AddServiceModal';
+import EditServiceModal from '@/components/modals/EditServiceModal';
+import AddWidgetModal from '@/components/modals/AddWidgetModal';
+import EditWidgetModal from '@/components/modals/EditWidgetModal';
+import UserManagement from '@/components/ui/UserManagement';
 import { useConfig } from '@/context/ConfigContext';
 import styles from './page.module.css';
 
 export default function SettingsPage() {
     const { theme, toggleTheme } = useTheme();
     const { config, updateConfig, loading } = useConfig();
-    const [activeModal, setActiveModal] = useState<'add-app' | 'edit-app' | 'add-link' | 'edit-link' | 'config' | null>(null);
+    const [activeModal, setActiveModal] = useState<'add-app' | 'edit-app' | 'add-link' | 'edit-link' | 'config' | 'add-widget' | 'edit-widget' | null>(null);
     const [configJson, setConfigJson] = useState('');
     const [editingItem, setEditingItem] = useState<Service | null>(null);
+    const [editingWidget, setEditingWidget] = useState<Widget | null>(null);
     const [localTitle, setLocalTitle] = useState('');
     const [localLocation, setLocalLocation] = useState('');
 
@@ -27,8 +30,6 @@ export default function SettingsPage() {
             setLocalLocation(config.weather?.location || '');
         }
     }, [config]);
-
-    // Removed local fetch effect
 
     const updateLayout = (key: string, value: any) => {
         if (!config) return;
@@ -158,7 +159,6 @@ export default function SettingsPage() {
         };
         reader.readAsText(file);
     };
-
 
     if (loading || !config) return <div className={styles.loading}>Loading...</div>;
 
@@ -320,6 +320,32 @@ export default function SettingsPage() {
             </section>
 
             <section className={styles.section}>
+                <h2 className={styles.sectionTitle}>Widgets</h2>
+                <div className={styles.actionsRow}>
+                    <button className={styles.btnPrimary} onClick={() => { setEditingItem(null); setActiveModal('add-widget'); }}>
+                        <Plus size={16} /> Add Widget
+                    </button>
+                    <button className={styles.btnSecondary} onClick={() => setActiveModal('edit-widget')}>
+                        <Edit3 size={16} /> Edit Widgets
+                    </button>
+                    <button className={styles.btnDanger}
+                        onClick={() => {
+                            if (!config) return;
+                            toast('Delete ALL widgets?', {
+                                action: {
+                                    label: 'Delete',
+                                    onClick: () => updateConfig({ ...config, widgets: [] })
+                                },
+                                cancel: { label: 'Cancel', onClick: () => { } }
+                            });
+                        }}
+                    >
+                        <Trash2 size={16} /> Delete All Widgets
+                    </button>
+                </div>
+            </section>
+
+            <section className={styles.section}>
                 <h2 className={styles.sectionTitle}>Users</h2>
                 <UserManagement />
             </section>
@@ -337,7 +363,7 @@ export default function SettingsPage() {
                         setConfigJson(JSON.stringify(config, null, 2));
                         setActiveModal('config');
                     }} className={styles.btnPrimary}>
-                        <Code size={16} /> Show Config
+                        <Code size={16} /> Edit Config
                     </button>
                     <button onClick={handleExport} className={styles.btnSecondary}>
                         <Download size={16} /> Export JSON
@@ -366,6 +392,27 @@ export default function SettingsPage() {
                     initialData={editingItem}
                 />
             )}
+            {activeModal === 'add-widget' && (
+                <AddWidgetModal
+                    onClose={() => { setActiveModal(null); setEditingWidget(null); }}
+                    initialData={editingWidget}
+                    onSave={(newWidget) => {
+                        if (!config) return;
+                        const currentWidgets = config.widgets || [];
+                        const exists = currentWidgets.some(w => w.id === newWidget.id);
+
+                        let updatedWidgets;
+                        if (exists) {
+                            updatedWidgets = currentWidgets.map(w => w.id === newWidget.id ? newWidget : w);
+                        } else {
+                            updatedWidgets = [...currentWidgets, newWidget];
+                        }
+
+                        updateConfig({ ...config, widgets: updatedWidgets });
+                        toast.success(exists ? 'Widget updated' : 'Widget added');
+                    }}
+                />
+            )}
             {activeModal === 'edit-app' && (
                 <EditServiceModal
                     title="Applications"
@@ -388,6 +435,24 @@ export default function SettingsPage() {
                     onEdit={(service) => {
                         setEditingItem(service);
                         setActiveModal('add-link');
+                    }}
+                />
+            )}
+            {activeModal === 'edit-widget' && (
+                <EditWidgetModal
+                    widgets={config.widgets || []}
+                    onClose={() => setActiveModal(null)}
+                    onDelete={(ids) => {
+                        if (!config) return;
+                        updateConfig({
+                            ...config,
+                            widgets: config.widgets?.filter(w => !ids.includes(w.id))
+                        });
+                        setActiveModal(null);
+                    }}
+                    onEdit={(widget) => {
+                        setEditingWidget(widget);
+                        setActiveModal('add-widget');
                     }}
                 />
             )}

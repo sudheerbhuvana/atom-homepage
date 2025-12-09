@@ -20,6 +20,7 @@ export const serviceSchema = z.object({
     category: z.string().optional(),
     description: z.string().optional(),
     color: z.string().optional(),
+    ping: z.string().optional(),
     createdAt: z.number().optional(),
     updatedAt: z.number().optional(),
 });
@@ -65,7 +66,7 @@ export const appConfigSchema = z.object({
     }).optional(),
     widgets: z.array(z.object({
         id: z.string(),
-        type: z.enum(['system-monitor', 'weather', 'clock']),
+        type: z.enum(['system-monitor', 'weather', 'clock', 'generic', 'docker']),
         title: z.string().optional(),
         options: z.record(z.string(), z.any()).optional(),
     })).optional(),
