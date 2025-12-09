@@ -71,8 +71,8 @@ export async function GET(
                 });
             },
             cancel() {
-                if (logsStream && typeof logsStream.destroy === 'function') {
-                    logsStream.destroy();
+                if (logsStream && typeof (logsStream as any).destroy === 'function') {
+                    (logsStream as any).destroy();
                 }
             }
         });
