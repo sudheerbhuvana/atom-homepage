@@ -2,7 +2,7 @@ name: Build and Push to Docker Hub
 
 on:
   push:
-    branches: [ main ]  # triggers on every push to main
+    branches: [ main ]
 
 jobs:
   build:
@@ -18,8 +18,16 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push image
+      - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
+          context: .
+          file: ./Dockerfile
           push: true
-          tags: sudheerbhuvana25/atom-dashboard:latest
+          tags: |
+            sudheerbhuvana25/atom-dashboard:latest
+            sudheerbhuvana25/atom-dashboard:${{ github.sha }}
+
+      - name: Log out from Docker Hub
+        if: always()
+        run: docker logout
