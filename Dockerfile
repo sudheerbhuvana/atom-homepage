@@ -1,52 +1,64 @@
-FROM node:24-alpine AS base
+name: Build and Push to Docker Hub
 
-# Update npm to the latest stable version (fixes CVEs like glob)
-RUN npm install -g npm@latest
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
-# Install dependencies only when needed
-FROM base AS deps
-RUN apk add --no-cache libc6-compat python3 make g++
-WORKDIR /app
+jobs:
+  docker:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    environment: DockerHub
 
-# Install dependencies
-COPY package.json package-lock.json* ./
-RUN npm ci
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-# Rebuild the source code only when needed
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+      - name: Set up QEMU (for multi-arch build)
+        uses: docker/setup-qemu-action@v3
 
-ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-# Production image, copy all the files and run next
-FROM base AS runner
-WORKDIR /app
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
+      - name: Restore Docker build cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
 
-RUN apk add --no-cache sqlite-libs iputils
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            sudheerbhuvana25/atom-homepage:latest
+            sudheerbhuvana25/atom-homepage:${{ github.run_number }}
+            sudheerbhuvana25/atom-homepage:${{ github.sha }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
 
-COPY --from=builder /app/public ./public
-RUN mkdir .next && chown nextjs:nodejs .next
+      - name: Move new cache into place
+        if: always()
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/src/lib/schema.sql ./src/lib/schema.sql
-
-# Persistent SQLite data directory
-RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
-ENV DATA_DIR="/app/data"
-VOLUME ["/app/data"]
-
-EXPOSE 3000
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-
-CMD ["node", "server.js"]
+      - name: Log out from Docker Hub
+        if: always()
+        run: docker logout
