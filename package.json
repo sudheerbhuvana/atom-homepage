@@ -33,7 +33,7 @@
         "better-sqlite3": "^12.5.0",
         "clsx": "^2.1.1",
         "dockerode": "^4.0.9",
-        "framer-motion": "^12.23.25",
+        "framer-motion": "^12.23.26",
         "lucide-react": "^0.561.0",
         "next": "16.0.10",
         "ping": "^1.0.0",
