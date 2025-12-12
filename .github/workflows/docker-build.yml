@@ -31,7 +31,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Cache Docker layers
+      - name: Restore Docker build cache
         uses: actions/cache@v4
         with:
           path: /tmp/.buildx-cache
@@ -52,6 +52,12 @@ jobs:
             sudheerbhuvana25/atom-homepage:${{ github.sha }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+
+      - name: Move new cache into place
+        if: always()
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
       - name: Log out from Docker Hub
         if: always()
