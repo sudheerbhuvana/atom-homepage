@@ -27,7 +27,7 @@
 - **Pre-built Integrations** - Ready-to-use templates for Sonarr, Radarr, Pi-hole, Glances, Tautulli, and more
 - **Customizable** - Multiple layouts, dark/light themes, and flexible widget system
 - **Secure** - Built-in authentication with bcrypt and session management
-- **Fast** - Built with Next.js 15, auto-refresh, and optimized rendering
+- **Fast** - Built with Next.js 16, auto-refresh, and optimized rendering
 - **Generic:** Any JSON API endpoint to use as a custom widget.
 
 **And many more..**
