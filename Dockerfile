@@ -28,7 +28,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN apk add --no-cache sqlite-libs && \
+RUN apk add --no-cache sqlite-libs curl && \
     apk upgrade --no-cache
 
 COPY --from=builder /app/public ./public
@@ -47,6 +47,6 @@ ENV HOSTNAME="0.0.0.0"
 #Cookie secure un comment to use behind https reverse proxy
 # ENV COOKIE_SECURE="false"
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})" || exit 1
+  CMD curl -f http://localhost:3000/api/health || exit 1
 
 CMD ["node", "server.js"]
